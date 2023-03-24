@@ -1,0 +1,100 @@
+
+//define sheets and array of alphabet
+var wordSh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Words");
+var hangmanSh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Hangman");
+var manSh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Man");
+let alphabet = ['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z'];
+let alphabetArray=[alphabet];
+var mapping = [['B1:D3','O18:Q20'],['C4:C8','P21:P25'],['D9:E10','Q26:R27'],['A9:B10','N26:O27'],['D5:E6','Q22:R23'],['A5:B6','N22:O23']];
+
+//cell change trigger function
+function cellChange(e){
+  if(hangmanSh.getRange(9,3,1,1).getA1Notation()==="C9"){
+    var eLetter = hangmanSh.getRange(9,3,1,1).getValue();
+    console.log(eLetter);
+    matchWords(eLetter);
+    //SpreadsheetApp.getUi().alert("please work")
+  };
+};
+
+//game start - clear board, select word, add alphabet, add word to sheet
+function gameStart(){
+  //clear out last game
+  hangmanSh.getRange("B6:AO6").clear().setFontColor("#ffffff");
+  hangmanSh.getRange("A11:AO11").clear();
+  hangmanSh.getRange("C9").clearContent();
+  hangmanSh.getRange("N2").clearContent();
+  hangmanSh.getRange("N2").setBackground('#ffffff');
+  hangmanSh.getRange("N18:R27").clear().setBackground('#efefef').setBorder(true, true, true, true, true, true, '#efefef', SpreadsheetApp.BorderStyle.SOLID);
+
+  //select gameword randomly from list of words in word sheet and return array of letters for chosen word
+  let words = wordSh.getRange(1,1,wordSh.getLastRow(),1).getValues();
+  let gameWord = words[Math.floor(Math.random() * words.length)];
+
+  //make the hangman count and word 
+  PropertiesService.getUserProperties().setProperty('hangmanCount', 0);
+  PropertiesService.getUserProperties().setProperty("hangmanWord", gameWord[0].toUpperCase());
+  console.log(gameWord,gameWord.length)
+
+  //set alphabet into row 11
+  hangmanSh.getRange("A11:Z11").setValues(alphabetArray);
+  
+  //set gameword into the sheet and the blue squares
+  let gameWordChars = gameWord[0].split('');
+  let gameWordCharsArray = [gameWordChars];
+  hangmanSh.getRange(6,3,1,gameWordChars.length).activate().setValues(gameWordCharsArray);
+  hangmanSh.getActiveRangeList().setBackground('#4285f4');
+  hangmanSh.getRange("B6:AO6").clearContent();
+
+  //trigger
+  if(ScriptApp.getProjectTriggers().length<=0){
+      ScriptApp.newTrigger('cellChange').forSpreadsheet(SpreadsheetApp.getActiveSpreadsheet()).onEdit().create();
+  };
+};
+
+// compare guessed letter to words
+function matchWords(letter){
+  var word = PropertiesService.getUserProperties().getProperty('hangmanWord').split('');
+  //console.log(word,word.length)
+  var count = PropertiesService.getUserProperties().getProperty('hangmanCount');
+  //console.log(count);
+  count = Number(count); 
+  //console.log(typeof count);
+  var tempArr = hangmanSh.getRange(6, 3, 1, word.length).getValues();
+  console.log(tempArr)
+  var notMatched = true;
+  letter = letter.toUpperCase();
+  
+  for(i=0;i<word.length;i++){
+    if(word[i]==letter){
+      tempArr[0][i] = letter;
+      notMatched = false;
+    } 
+  };
+  
+  if(notMatched){
+    console.log('Draw man');
+    console.log(mapping[count][0]);
+    console.log(mapping[count][1]);
+    manSh.getRange(mapping[count][0]).copyTo(hangmanSh.getRange(mapping[count][1]))
+    count++;
+  };
+
+  hangmanSh.getRange(6, 3, 1, word.length).setValues(tempArr);
+  if(word.join()==tempArr.join()){
+    console.log("win");
+     hangmanSh.getRange("N2").setValue("Winner!").setFontColor('#ffffff').setFontSize(24);
+     hangmanSh.getRange("N2").setBackgroundColor('#34A853')
+  };
+  if(count==6){
+     hangmanSh.getRange("N2").setValue("Loser!").setFontColor('##ff0000').setFontSize(24);
+     hangmanSh.getRange("N2").setBackgroundColor('#ea4335')
+     console.log(word);
+     hangmanSh.getRange(6, 3, 1, word.length).setValues([word]);
+  };
+  var availableLetters = hangmanSh.getRange("A11:Z11").getValues()[0].join("");
+  availableLetters = availableLetters.replace(letter.toUpperCase()," ");
+  hangmanSh.getRange("A11:Z11").setValues([availableLetters.split("")]);
+  
+  PropertiesService.getUserProperties().setProperty('hangmanCount', count);
+};
